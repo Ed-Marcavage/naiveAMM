@@ -271,12 +271,15 @@ contract TSwapPool is ERC20 {
         // totalPoolTokensOfPool) + (wethToDeposit * poolTokensToDeposit) = k
         // (totalWethOfPool * totalPoolTokensOfPool) + (wethToDeposit * totalPoolTokensOfPool) = k - (totalWethOfPool *
         // poolTokensToDeposit) - (wethToDeposit * poolTokensToDeposit)
-        uint256 inputAmountMinusFee = inputAmount * 997;
-        uint256 numerator = inputAmountMinusFee * outputReserves;
-        uint256 denominator = (inputReserves * 1000) + inputAmountMinusFee;
+        //uint256 inputAmountMinusFee = inputAmount * 997;
+        // dy = Ydx / (X + dx)
+        uint256 numerator = outputReserves * inputAmount;
+        uint256 denominator = inputReserves + inputAmount;
         return numerator / denominator;
     }
 
+    // solves for ∆x (inputAmount)
+    //  - gets inputAmount required to get outputAmount
     function getInputAmountBasedOnOutput(
         uint256 outputAmount,
         uint256 inputReserves,
@@ -288,9 +291,21 @@ contract TSwapPool is ERC20 {
         revertIfZero(outputReserves)
         returns (uint256 inputAmount)
     {
+        // ∆y = outputAmount
+        // y = outputReserves
+        // x = inputReserves
+        // ∆x = inputAmount (solve for this)
+        //--------------------------------
+        // x * y = (x + ∆x) * (y − ∆y)
+        // x * y = (x + ∆x) * (y − outputAmount)
+        // XY = XY - outputAmountX + ∆xY - outputAmount∆x
+        // outputAmountX = ∆xY - outputAmount∆x
+        // outputAmountX = ∆x(Y - outputAmount)
+        // inputReserves * outputAmount = inputAmount(outputReserves - outputAmount) // just changed the variable names
+        // inputAmount = (inputReserves * outputAmount) / (outputReserves - outputAmount)
         return
-            ((inputReserves * outputAmount) * 10000) /
-            ((outputReserves - outputAmount) * 997);
+            ((inputReserves * outputAmount)) /
+            ((outputReserves - outputAmount));
     }
 
     function swapExactInput(

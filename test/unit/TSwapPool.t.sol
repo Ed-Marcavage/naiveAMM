@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import { Test, console } from "forge-std/Test.sol";
-import { TSwapPool } from "../../src/PoolFactory.sol";
-import { ERC20Mock } from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
-import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
+import {Test, console} from "forge-std/Test.sol";
+import {TSwapPool} from "../../src/PoolFactory.sol";
+import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
+import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 contract TSwapPoolTest is Test {
     TSwapPool pool;
@@ -17,7 +17,12 @@ contract TSwapPoolTest is Test {
     function setUp() public {
         poolToken = new ERC20Mock();
         weth = new ERC20Mock();
-        pool = new TSwapPool(address(poolToken), address(weth), "LTokenA", "LA");
+        pool = new TSwapPool(
+            address(poolToken),
+            address(weth),
+            "LTokenA",
+            "LA"
+        );
 
         weth.mint(liquidityProvider, 200e18);
         poolToken.mint(liquidityProvider, 200e18);
@@ -25,6 +30,63 @@ contract TSwapPoolTest is Test {
         weth.mint(user, 10e18);
         poolToken.mint(user, 10e18);
     }
+
+    modifier deposit() {
+        vm.startPrank(liquidityProvider);
+        // ETH
+        weth.approve(address(pool), 100e18);
+        // Link
+        poolToken.approve(address(pool), 100e18);
+
+        pool.deposit(
+            1000e18, // WETH
+            1000e18, // Min Link
+            1000e18, // Max Link
+            uint64(block.timestamp)
+        );
+
+        assertEq(pool.balanceOf(liquidityProvider), 100e18); // started with 0
+        assertEq(weth.balanceOf(liquidityProvider), 100e18); // started with 200
+        assertEq(poolToken.balanceOf(liquidityProvider), 100e18); // started with 200
+
+        // The pool should have 100 WETH and 100 Link
+        assertEq(weth.balanceOf(address(pool)), 100e18);
+        assertEq(poolToken.balanceOf(address(pool)), 100e18);
+        _;
+    }
+
+    //https://faisalkhan.com/learn/payments-wiki/formulas-for-automated-market-makers-amms/
+    function test_getOutputAmountBasedOnInput() public {
+        uint256 inputAmount = 100e18;
+        uint256 inputReserve = 1000e18;
+        uint256 outputReserve = 1000e18;
+
+        // dy = dx * y / (x + dx)
+        uint256 outputAmount = pool.getOutputAmountBasedOnInput(
+            inputAmount,
+            inputReserve,
+            outputReserve
+        );
+        //90.909090909090909090
+        console.log("outputAmount", outputAmount);
+    }
+
+    function test_getInputAmountBasedOnOutput() public {
+        uint256 inputAmount = 100e18;
+        uint256 inputReserve = 1000e18;
+        uint256 outputReserve = 1000e18;
+
+        // dy = dx * y / (x + dx)
+        uint256 outputAmount = pool.getInputAmountBasedOnOutput(
+            inputAmount,
+            inputReserve,
+            outputReserve
+        );
+        //111.111111111111111111
+        console.log("outputAmount", outputAmount);
+    }
+
+    // --------------OLD TESTS----------------
 
     function testDeposit() public {
         vm.startPrank(liquidityProvider);
@@ -54,7 +116,13 @@ contract TSwapPoolTest is Test {
         // 110 * ~91 = 10,000
         uint256 expected = 9e18;
 
-        pool.swapExactInput(poolToken, 10e18, weth, expected, uint64(block.timestamp));
+        pool.swapExactInput(
+            poolToken,
+            10e18,
+            weth,
+            expected,
+            uint64(block.timestamp)
+        );
         assert(weth.balanceOf(user) >= expected);
     }
 
@@ -82,13 +150,23 @@ contract TSwapPoolTest is Test {
         vm.startPrank(user);
         uint256 expected = 9e18;
         poolToken.approve(address(pool), 10e18);
-        pool.swapExactInput(poolToken, 10e18, weth, expected, uint64(block.timestamp));
+        pool.swapExactInput(
+            poolToken,
+            10e18,
+            weth,
+            expected,
+            uint64(block.timestamp)
+        );
         vm.stopPrank();
 
         vm.startPrank(liquidityProvider);
         pool.approve(address(pool), 100e18);
         pool.withdraw(100e18, 90e18, 100e18, uint64(block.timestamp));
         assertEq(pool.totalSupply(), 0);
-        assert(weth.balanceOf(liquidityProvider) + poolToken.balanceOf(liquidityProvider) > 400e18);
+        assert(
+            weth.balanceOf(liquidityProvider) +
+                poolToken.balanceOf(liquidityProvider) >
+                400e18
+        );
     }
 }
