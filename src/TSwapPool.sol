@@ -246,6 +246,7 @@ contract TSwapPool is ERC20 {
                               GET PRICING
     //////////////////////////////////////////////////////////////*/
 
+    // solves for Δy (outputAmount) ??
     function getOutputAmountBasedOnInput(
         uint256 inputAmount,
         uint256 inputReserves,
@@ -273,9 +274,7 @@ contract TSwapPool is ERC20 {
         // poolTokensToDeposit) - (wethToDeposit * poolTokensToDeposit)
         //uint256 inputAmountMinusFee = inputAmount * 997;
         // dy = Ydx / (X + dx)
-        uint256 numerator = outputReserves * inputAmount;
-        uint256 denominator = inputReserves + inputAmount;
-        return numerator / denominator;
+        return (outputReserves * inputAmount) / (inputReserves + inputAmount);
     }
 
     // solves for ∆x (inputAmount)
@@ -308,6 +307,7 @@ contract TSwapPool is ERC20 {
             ((outputReserves - outputAmount));
     }
 
+    // _sell_
     function swapExactInput(
         IERC20 inputToken,
         uint256 inputAmount,
@@ -347,6 +347,7 @@ contract TSwapPool is ERC20 {
      * @param outputToken ERC20 token to send to caller
      * @param outputAmount The exact amount of tokens to send to caller
      */
+    //Used when a user wants to _buy_ a specific amount of token Y and needs to know how much of token X is required
     function swapExactOutput(
         IERC20 inputToken,
         IERC20 outputToken,
@@ -375,6 +376,7 @@ contract TSwapPool is ERC20 {
      * @param poolTokenAmount amount of pool tokens to sell
      * @return wethAmount amount of WETH received by caller
      */
+    //sellPoolTokens -> swapExactOutput -> getInputAmountBasedOnOutput
     function sellPoolTokens(
         uint256 poolTokenAmount
     ) external returns (uint256 wethAmount) {
@@ -382,7 +384,7 @@ contract TSwapPool is ERC20 {
             swapExactOutput(
                 i_poolToken,
                 i_wethToken,
-                poolTokenAmount,
+                poolTokenAmount, // @audit output should be weth
                 uint64(block.timestamp)
             );
     }

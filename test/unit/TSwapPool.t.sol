@@ -24,39 +24,44 @@ contract TSwapPoolTest is Test {
             "LA"
         );
 
-        weth.mint(liquidityProvider, 200e18);
-        poolToken.mint(liquidityProvider, 200e18);
+        // weth.mint(liquidityProvider, 200e18);
+        // poolToken.mint(liquidityProvider, 200e18);
 
-        weth.mint(user, 10e18);
-        poolToken.mint(user, 10e18);
+        // weth.mint(user, 10e18);
+        // poolToken.mint(user, 10e18);
     }
 
     modifier deposit() {
         vm.startPrank(liquidityProvider);
+
         // ETH
-        weth.approve(address(pool), 100e18);
+        weth.mint(liquidityProvider, 1000e18);
+        weth.approve(address(pool), 1000e18);
         // Link
-        poolToken.approve(address(pool), 100e18);
+        poolToken.mint(liquidityProvider, 1000e18);
+        poolToken.approve(address(pool), 1000e18);
 
         pool.deposit(
             1000e18, // WETH
-            1000e18, // Min Link
+            1000e18, // Min TSWAP-Token
             1000e18, // Max Link
             uint64(block.timestamp)
         );
+        vm.stopPrank();
 
-        assertEq(pool.balanceOf(liquidityProvider), 100e18); // started with 0
-        assertEq(weth.balanceOf(liquidityProvider), 100e18); // started with 200
-        assertEq(poolToken.balanceOf(liquidityProvider), 100e18); // started with 200
+        assertEq(pool.balanceOf(liquidityProvider), 1000e18); // started with 0
+        assertEq(weth.balanceOf(liquidityProvider), 0); // started with 200
+        assertEq(poolToken.balanceOf(liquidityProvider), 0); // started with 200
 
         // The pool should have 100 WETH and 100 Link
-        assertEq(weth.balanceOf(address(pool)), 100e18);
-        assertEq(poolToken.balanceOf(address(pool)), 100e18);
+        assertEq(weth.balanceOf(address(pool)), 1000e18);
+        assertEq(poolToken.balanceOf(address(pool)), 1000e18);
         _;
     }
 
     //https://faisalkhan.com/learn/payments-wiki/formulas-for-automated-market-makers-amms/
     function test_getOutputAmountBasedOnInput() public {
+        // "For your 100e18 tokens X, we can give you 90.9090 tokens Y."
         uint256 inputAmount = 100e18;
         uint256 inputReserve = 1000e18;
         uint256 outputReserve = 1000e18;
@@ -71,19 +76,58 @@ contract TSwapPoolTest is Test {
         console.log("outputAmount", outputAmount);
     }
 
+    // todo
+    // Start here - revist math in getInputAmountBasedOnOutput
+    // determine when to use getInputAmountBasedOnOutput vs getOutputAmountBasedOnInput
+    // then move to getOutputAmountBasedOnInput
+    // getOutput seems to be how much of said token needs to be removed from pool to keep K constant
+    // getInput seems to be how much of said token needs to be added to pool to keep K constant
+    // prompt next - why are ^ these two funcs inverses of each other
+    // -
+    //"To receive 100e18 tokens Y, you need to provide approximately 111.1111 tokens X."
     function test_getInputAmountBasedOnOutput() public {
-        uint256 inputAmount = 100e18;
+        uint256 outputAmount = 100e18;
         uint256 inputReserve = 1000e18;
         uint256 outputReserve = 1000e18;
 
         // dy = dx * y / (x + dx)
-        uint256 outputAmount = pool.getInputAmountBasedOnOutput(
-            inputAmount,
+        // getInputAmountBasedOnOutput solves for dx
+        uint256 end = pool.getInputAmountBasedOnOutput(
+            outputAmount,
             inputReserve,
             outputReserve
         );
         //111.111111111111111111
-        console.log("outputAmount", outputAmount);
+        console.log("outputAmount", end);
+    }
+
+    // // @audit output should be weth
+    function test_sellPoolTokens() public deposit {
+        uint256 desiredWethForPoolTokens = 100e18; //outputAmount
+
+        uint256 poolTokensNeeded = pool.getInputAmountBasedOnOutput(
+            desiredWethForPoolTokens,
+            poolToken.balanceOf(address(pool)),
+            weth.balanceOf(address(pool))
+        );
+
+        vm.startPrank(user);
+
+        poolToken.mint(user, poolTokensNeeded);
+        poolToken.approve(address(pool), poolTokensNeeded);
+
+        // weth.mint(user, poolTokensNeeded);
+        // weth.approve(address(pool), poolTokensNeeded);
+
+        console.log("poolToken Balance Before: ", poolToken.balanceOf(user));
+        console.log("weth Balance Before: ", weth.balanceOf(user));
+        pool.sellPoolTokens(desiredWethForPoolTokens);
+        console.log("poolToken Balance After: ", poolToken.balanceOf(user));
+        console.log("weth Balance After: ", weth.balanceOf(user));
+        vm.stopPrank();
+
+        assertEq(weth.balanceOf(user), desiredWethForPoolTokens);
+        //111.111111111111111111
     }
 
     // --------------OLD TESTS----------------
