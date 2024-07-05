@@ -131,7 +131,9 @@ contract TSwapPoolTest is Test {
     }
 
     // Fuzz test where `outputAmount` is fuzzed by Foundry
-    function testFuzzGetInputAmountBasedOnOutput(uint256 outputAmount) public {
+    function testFuzzGetInputAmountBasedOnOutput(
+        uint256 outputAmount
+    ) public view {
         uint256 inputReserve = 1000e18;
         uint256 outputReserve = 1000e18;
 
@@ -156,6 +158,36 @@ contract TSwapPoolTest is Test {
 
         // Assertion to ensure the calculation within the contract is correct
         assertEq(inputAmount, expectedInputAmount);
+    }
+
+    // Fuzz test where `outputAmount` is fuzzed by Foundry
+    function testFuzzGetOutputAmountBasedOnInput(
+        uint256 inputAmount
+    ) public view {
+        uint256 inputReserve = 1000e18;
+        uint256 outputReserve = 1000e18;
+
+        // To prevent unrealistic test cases and divide-by-zero errors
+        vm.assume(inputAmount > 0 && inputAmount < outputReserve);
+
+        // dy = dx * y / (x + dx)
+        // getInputAmountBasedOnOutput solves for dx
+        uint256 ActualOutput = pool.getOutputAmountBasedOnInput(
+            inputAmount,
+            inputReserve,
+            outputReserve
+        );
+
+        // Calculate expected dx to verify correctness of the function
+        uint256 expectedOutput = (outputReserve * inputAmount) /
+            (outputReserve + inputAmount);
+
+        // Logging for debugging purposes
+        console.log("Calculated ActualOutput", ActualOutput);
+        console.log("Expected expectedOutput", expectedOutput);
+
+        // Assertion to ensure the calculation within the contract is correct
+        assertEq(ActualOutput, expectedOutput);
     }
 
     // --------------OLD TESTS----------------
