@@ -121,13 +121,41 @@ contract TSwapPoolTest is Test {
 
         console.log("poolToken Balance Before: ", poolToken.balanceOf(user));
         console.log("weth Balance Before: ", weth.balanceOf(user));
-        pool.sellPoolTokens(desiredWethForPoolTokens);
+        pool.sellPoolTokens(desiredWethForPoolTokens, 90909090909090909090);
         console.log("poolToken Balance After: ", poolToken.balanceOf(user));
         console.log("weth Balance After: ", weth.balanceOf(user));
         vm.stopPrank();
 
-        assertEq(weth.balanceOf(user), desiredWethForPoolTokens);
+        assertEq(weth.balanceOf(user), 90909090909090909090);
         //111.111111111111111111
+    }
+
+    // Fuzz test where `outputAmount` is fuzzed by Foundry
+    function testFuzzGetInputAmountBasedOnOutput(uint256 outputAmount) public {
+        uint256 inputReserve = 1000e18;
+        uint256 outputReserve = 1000e18;
+
+        // To prevent unrealistic test cases and divide-by-zero errors
+        vm.assume(outputAmount > 0 && outputAmount < outputReserve);
+
+        // dy = dx * y / (x + dx)
+        // getInputAmountBasedOnOutput solves for dx
+        uint256 inputAmount = pool.getInputAmountBasedOnOutput(
+            outputAmount,
+            inputReserve,
+            outputReserve
+        );
+
+        // Calculate expected dx to verify correctness of the function
+        uint256 expectedInputAmount = (outputAmount * inputReserve) /
+            (outputReserve - outputAmount);
+
+        // Logging for debugging purposes
+        console.log("Calculated inputAmount", inputAmount);
+        console.log("Expected inputAmount", expectedInputAmount);
+
+        // Assertion to ensure the calculation within the contract is correct
+        assertEq(inputAmount, expectedInputAmount);
     }
 
     // --------------OLD TESTS----------------
